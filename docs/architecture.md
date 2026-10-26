@@ -45,7 +45,7 @@ flowchart LR
 | `firmware/platform` | Clock, TIM6, TIM7, USART2, DWT, LED | Control gains |
 | `firmware/rtos` | `FreeRTOSConfig.h`, assert and stack hooks | Application policy |
 
-`MotorPlant` is the Phase 2 seam. It is one concrete class today (`SimulatedMotor`), not a device framework. A later position/velocity source and a torque or current command would implement the same methods or a small extension of them. The 100 Hz task would still call `sample()`.
+`MotorPlant` is the Phase 2 seam. It is one concrete class today (`SimulatedMotor`), not a device framework. The later source is the FIT1035's AS5600, and the later command is the q-axis voltage for voltage-mode FOC on the DRI0058. The 100 Hz task would still call `sample()`. The Park transform and the three PWM duties run on a faster release. See [phase2-hardware.md](phase2-hardware.md).
 
 ## Tasks
 

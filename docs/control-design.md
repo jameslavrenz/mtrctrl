@@ -86,6 +86,6 @@ Zero setpoint is a normal command. The PID regulates toward zero; it is not a sp
 
 ## What Phase 2 changes
 
-The outer speed PID can stay at a rate near 100 Hz. Rotor-angle commutation or FOC cannot. The FIT1035's electrical frequency at 1800 RPM with 7 pole pairs is 210 Hz, and a current loop has to run well above that. The Phase 1 rate is the speed loop only. [phase2-hardware.md](phase2-hardware.md) separates the two rates.
+The outer speed PID can stay at a rate near 100 Hz. Voltage-mode FOC cannot. The FIT1035's electrical frequency at 1800 RPM with 7 pole pairs is 210 Hz, and the PWM carrier has to run well above that. The Phase 1 rate is the speed loop only. [phase2-hardware.md](phase2-hardware.md) separates the two rates.
 
-The PID will then regulate speed estimated from the AS5600, and its output will be a torque or current reference for an inner loop, not a duty cycle written straight to the three phase pins. The normalized ±1 limit is the place that current limit will be applied. It is not a current limit today.
+The PID will then regulate speed estimated from the AS5600. Its output is the q-axis voltage `Uq` for voltage-mode FOC, with `Ud` held at 0. Inverse Park and inverse Clarke turn that voltage and the electrical angle into three phase voltages, and those become PWM duties on the DRI0058 inputs. The normalized ±1 limit is where the q-axis voltage limit will sit. It is not a current limit, and voltage mode does not measure phase current.

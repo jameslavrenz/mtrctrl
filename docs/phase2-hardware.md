@@ -41,6 +41,14 @@ Wiki: https://wiki.dfrobot.com/dri0058
 
 The motor's rated current is 0.8 A, which is under 2.5 A, but the motor can draw more than rated current at start and at stall. Nothing in the published motor data says the stall current is below the driver's per-channel maximum. Phase 2 cannot treat "rated 0.8 A, driver 2.5 A" as proof the combination is safe at any duty cycle or any supply. A current limit, a supply choice, and a check of the driver's fault pin have to be established before the shaft is allowed to run unattended. This repository does not establish them.
 
+## Voltage-mode FOC
+
+The DRI0058 is the gate driver for voltage-mode field-oriented control, the SimpleFOC torque mode called `voltage`. The STM32 reads the FIT1035's AS5600, forms the electrical angle (mechanical angle times 7 pole pairs, plus the alignment offset), and applies a q-axis voltage `Uq` from the speed PID. `Ud` stays 0. Inverse Park and inverse Clarke produce three phase voltages. Each voltage is a PWM duty on IN1, IN2, or IN3, centered at 50% and scaled by the motor-bus voltage.
+
+That is the voltage-control variety of FOC. Current-mode FOC needs phase-current samples. The DRI0058's published inputs are the three PWM pins, enable, reset, sleep, and the fault output. It does not provide those current samples, so `dc_current` and `foc_current` are not the plan for this pair of boards.
+
+The PWM carrier has to be well above the 210 Hz electrical frequency at 1800 RPM. Which timer, which pins, and which carrier frequency are still wiring and bring-up choices. They are not selected in this tree. The 100 Hz FreeRTOS speed task publishes `Uq`. It does not run the Park transform or write the three duties. A faster timer, or the PWM update interrupt, releases that work.
+
 ## What has to be built
 
 1. AS5600 on I²C at 3.3 V. The F446 has I²C peripherals; which pins, and whether the encoder's default address conflicts with anything else on the bus, is a wiring decision.
@@ -48,8 +56,8 @@ The motor's rated current is 0.8 A, which is under 2.5 A, but the motor can draw
 3. Electrical angle: mechanical angle times 7 pole pairs, plus the offset found at alignment.
 4. An alignment move at low current before closed-loop commutation. That current is part of the limit discussion above.
 5. Three PWM channels for IN1–IN3, plus GPIO for enable, reset, and sleep, and an input for the fault pin.
-6. An inner commutation or FOC loop. SimpleFOC-style sinusoidal PWM is the driver's intended input. The STM32 does that modulation; the DRI0058 does not.
-7. The existing speed PID, with its output interpreted as a current or torque reference for the inner loop, still clamped to a range that now means amperes.
+6. The voltage-mode FOC update. Inverse Park and inverse Clarke from `Uq`, `Ud = 0`, and the electrical angle, then three PWM duties for IN1–IN3. The DRI0058 does not do that modulation.
+7. The existing speed PID, with its output interpreted as the q-axis voltage, still clamped. The clamp is a voltage limit. It is not an ampere limit.
 8. Two rates. The speed loop can stay near 100 Hz. The electrical frequency at 1800 RPM and 7 pole pairs is 210 Hz, so the inner loop has to be much faster than both. TIM7's 100 Hz notification is the wrong release for the inner loop. A faster timer, or a PWM update interrupt, should release that work. It should not run inside the speed task.
 9. Enable sequencing: sleep and reset released, fault checked, alignment, then enable. The reverse on stop and on fault.
 10. A supply for the motor power input, separate from the Nucleo's USB 5 V. The motor is a 12 V, 14 W part. USB cannot feed it.
@@ -59,11 +67,11 @@ The motor's rated current is 0.8 A, which is under 2.5 A, but the motor can draw
 
 | Keep | Replace or extend |
 | --- | --- |
-| `PidController` and the gain, saturation, and anti-windup rules | The meaning of ±1, from "normalized torque in the model" to "current reference" |
+| `PidController` and the gain, saturation, and anti-windup rules | The meaning of ±1, from "normalized torque in the model" to "q-axis voltage `Uq`" |
 | Control, command, telemetry, and supervisor tasks | A faster inner-loop release, not a fifth copy of the speed task |
 | Command queue and the snapshot seqlock | Feedback: `MotorPlant::speed_rad_s` and `feedback_valid` filled from the encoder estimate |
 | Fault policy and `reset faults` | Driver fault and overcurrent as additional trip bits, and a GPIO action that disables the bridge |
-| 100 Hz outer sample order (read, compute, apply) | Apply becomes "publish the current reference" rather than "Euler step" |
+| 100 Hz outer sample order (read, compute, apply) | Apply becomes "publish `Uq`" rather than "Euler step" |
 
 `SimulatedMotor` can remain in the tree behind a compile-time choice so the console and the supervisor still run with no inverter on the bench. That choice should be a single translation unit, not a class hierarchy.
 

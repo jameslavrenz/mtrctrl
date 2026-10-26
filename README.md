@@ -1,8 +1,6 @@
 # mtrctrl
 
-Phase 1 of a FreeRTOS speed controller for a brushless DC motor, running on a NUCLEO-F446RE. The control law and the mechanical plant both run on the STM32. There is no physical motor in this phase. A simulated plant stands in for the rotor so the scheduling, the PID, and the fault policy can be exercised with only the board and a USB cable.
-
-Phase 2, the DFRobot FIT1035 motor, the AS5600 encoder, and the DRI0058 SimpleFOCmini driver, is specified in [docs/phase2-hardware.md](docs/phase2-hardware.md) and is not implemented.
+A FreeRTOS speed controller for a brushless DC motor on the ST NUCLEO-F446RE. Phase 1 runs the PID and a simulated mechanical plant on the STM32F446, so the scheduler, the fault policy, and the console can be tested with only the Nucleo and a USB cable. The motor, the encoder, and the driver are the Phase 2 hardware below. That phase is specified in [docs/phase2-hardware.md](docs/phase2-hardware.md) and is not implemented: this tree has no FOC, no phase PWM, and no encoder driver.
 
 The application calls the FreeRTOS kernel directly (`xTaskCreateStatic`, task notifications, queues, a mutex). It does not use CMSIS-RTOS.
 
@@ -23,11 +21,20 @@ Homebrew's GCC 16 bottle is built without C++ headers. `tools/find-arm-cxx.sh` f
 
 ## Hardware
 
+Three boards. Only the Nucleo is used by the firmware in this repository.
+
+| Role | Part | What it contributes |
+| --- | --- | --- |
+| Dev board | ST NUCLEO-F446RE (MB1136) | STM32F446RET6, Cortex-M4F, 180 MHz, 512 KiB flash, 128 KiB SRAM. ST-Link, SWD, and the virtual COM port |
+| Motor | DFRobot FIT1035 (DigiKey 1738-FIT1035-ND) | 12 V, 14 W, 0.8 A, 1800 RPM, 7 pole pairs, star winding. The AS5600 absolute encoder is built into the motor |
+| Driver | DFRobot DRI0058 SimpleFOCmini (DigiKey 1738-DRI0058-ND) | Three-phase gate driver and inverter. Motor supply 8–30 V, 2.5 A maximum per channel. Logic at 3.3 V or 5 V |
+
+The FIT1035's sensor is an ams OSRAM AS5600: 12-bit absolute angle, I²C, 3.3 V. It is part of the motor, not part of the DRI0058. The DRI0058 does not close a control loop and it does not measure phase current. Its inputs are IN1, IN2, IN3, enable, reset, and sleep, plus an active-low fault output. The phase outputs are M1, M2, and M3. The STM32 has to produce the three PWM waveforms. Published notes and the bring-up order are in [docs/phase2-hardware.md](docs/phase2-hardware.md). Product pages: [FIT1035](https://wiki.dfrobot.com/fit1035/) and [DRI0058](https://wiki.dfrobot.com/dri0058).
+
+On the Nucleo today:
+
 | Item | Value |
 | --- | --- |
-| Board | NUCLEO-F446RE (MB1136) |
-| MCU | STM32F446RET6, Cortex-M4F, 180 MHz |
-| Flash / SRAM | 512 KiB / 128 KiB |
 | Console | ST-Link virtual COM port, USART2 on PA2 (TX) and PA3 (RX), 115200 8N1 |
 | Status LED | LD2, PA5 |
 | Debug | SWD through CN2, both jumpers fitted |
@@ -37,6 +44,33 @@ The console is the ST-Link USB serial port wired to USART2.
 Factory solder bridges for that serial port are SB13 and SB14 fitted (0 Ω) and SB62 and SB63 open. That is the configuration that connects the ST-Link to PA2 and PA3. Closing SB62 and SB63 disconnects the ST-Link and routes those pins to the Arduino D1 and D0 headers. Leave SB62 and SB63 open. CN3 is an unpopulated header on the same nets, useful as test points. JP5 at U5V and JP6 fitted are the usual USB-powered setup.
 
 On the board used for bring-up, ST-Link firmware V2J33M25 transmitted the banner and did not deliver host bytes to PA3. Updating that probe to V2J47M34 restored receive, and `help` then got a reply. The updater shipped with STM32CubeIDE is `STLinkUpgrade.jar` (`java -jar STLinkUpgrade.jar -update` against the plugged-in board). OpenOCD on this probe has to connect under reset at 480 kHz. The settings are in `firmware/openocd/nucleo_f446re.cfg`.
+
+The motor supply is separate from the Nucleo's USB 5 V. The FIT1035 is a 12 V, 14 W motor. USB does not feed it. No motor supply, current limit, or driver-fault check has been established in this repository.
+
+## FreeRTOS
+
+FreeRTOS-Kernel V11.3.2 is vendored under `third_party/` and called directly. `USE_RTOS` in the HAL stays 0. The banner prints the kernel's own version macro, which in that tag is still `V11.1.0+`.
+
+The kernel is here so the 100 Hz speed sample, the command parser, and the 10 Hz log can block independently on one UART. A PID loop does not require a scheduler. A timer interrupt plus a main loop would also be a valid motor controller, and [docs/freertos-design.md](docs/freertos-design.md) says why this project did not do that. Priorities, the TIM7 notification, the command queue, the TX mutex, and the deadline counters are in that note. The task table below is the Phase 1 map.
+
+The future voltage-mode FOC update does not belong in the 100 Hz task. That task stays the outer speed loop. The PWM carrier, or a faster timer, releases the electrical update. The design note for the two rates is in [docs/phase2-hardware.md](docs/phase2-hardware.md).
+
+## Voltage-mode FOC and PWM
+
+Phase 1 commands a normalized torque inside the simulated plant. It does not configure a timer for motor PWM, and it does not transform a rotor angle into phase voltages.
+
+The hardware path is voltage-mode field-oriented control, the same idea as SimpleFOC torque mode `voltage`. It is the variety that matches the DRI0058: three PWM inputs and no phase-current measurement. Current-mode FOC (`dc_current` or `foc_current`) needs phase-current samples this driver does not provide, so it is not the plan.
+
+One electrical update, once Phase 2 exists, is:
+
+1. Read the AS5600 mechanical angle over I²C. Estimate speed from that angle for the outer loop. Do not block the speed task on the bus transfer.
+2. Electrical angle is mechanical angle times 7 pole pairs, plus the offset found during alignment.
+3. The existing speed PID runs near 100 Hz. Its output is the q-axis voltage `Uq`. The d-axis voltage `Ud` stays 0. This scheme has no field weakening.
+4. Inverse Park and inverse Clarke turn `Ud`, `Uq`, and the electrical angle into three phase voltages.
+5. Each phase voltage becomes a duty cycle on a center-aligned PWM channel, around a 50% zero, scaled by the motor-bus voltage and clipped. Those three duties drive IN1, IN2, and IN3.
+6. Enable, reset, and sleep are GPIO. The fault pin stops the PWM. The carrier frequency has to sit well above the electrical frequency, which is 210 Hz at 1800 RPM with 7 pole pairs. The carrier rate itself is still a Phase 2 choice. It is not a number in this tree.
+
+The 100 Hz PID output is therefore a voltage command, not a duty written straight to the phase pins and not a current in amperes. The ±1 clamp in Phase 1 is the normalized torque of the simulated plant. In voltage mode that same clamp is where the q-axis voltage limit will sit. A real current limit still has to be chosen, because voltage mode does not measure current and the motor can exceed its 0.8 A rating at stall.
 
 ## What the firmware does
 
@@ -171,14 +205,14 @@ Read in this order if you are new to the tree:
 3. [FreeRTOS design](docs/freertos-design.md), for why the kernel is called directly, and why a PID loop does not require one.
 4. [Control design](docs/control-design.md), for the PID equations and which plant numbers are derived versus chosen.
 5. [Verification](docs/verification-validation.md), for host results and the numbers measured on this Nucleo.
-6. [Phase 2 hardware](docs/phase2-hardware.md), for the motor, encoder, and driver that are not in this phase.
+6. [Phase 2 hardware](docs/phase2-hardware.md), for the FIT1035, the AS5600, the DRI0058, and the voltage-mode FOC and PWM plan.
 7. [Vendored versions](third_party/VERSIONS.md), for the pinned FreeRTOS, CMSIS, and HAL commits.
 
 ## Roadmap
 
 Phase 1 is the tree as it stands: native FreeRTOS, a 100 Hz speed PID, an illustrative mechanical plant on the MCU, a serial command and telemetry console, and a host test suite. The board procedure in `tools/hwtest.py` has been run on one NUCLEO-F446RE. The record of that run is the verification note.
 
-Phase 2 replaces the simulated plant with the FIT1035, the AS5600, and the DRI0058. The speed PID, the task layout, and the fault policy are meant to stay. The inner electrical loop, the encoder, PWM, and a real current limit are not started. The bring-up order and the safety limits that still have to be established are in the Phase 2 note.
+Phase 2 replaces the simulated plant with the FIT1035, its AS5600, and the DRI0058. The speed PID stays the outer loop. Voltage-mode FOC and the three PWM channels are the inner electrical path, and they are not started. The bring-up order and the current and supply limits that still have to be established are in the Phase 2 note.
 
 ## Limitations
 

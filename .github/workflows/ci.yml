@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install host tools
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build python3
+      - name: Unit tests
+        run: cmake -S . -B build/host -G Ninja && cmake --build build/host && ctest --test-dir build/host --output-on-failure
+
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the Arm toolchain
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi
+      - name: Cross-compile
+        run: cmake -S . -B build/fw -G Ninja --toolchain cmake/arm-none-eabi.cmake && cmake --build build/fw
+
+  cppcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+      - name: Static analysis
+        run: make cppcheck

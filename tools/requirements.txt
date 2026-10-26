@@ -1,0 +1,3 @@
+# Host plotting only. The board test in tools/hwtest.py uses the Python
+# standard library and does not need this file.
+matplotlib>=3.8

@@ -62,7 +62,10 @@
 
 \textbf{Scope and status.}\quad This is a mathematical and implementation design note, \textbf{not} evidence of a built or validated Phase 2 drive. The repository's present Phase 1 controls a \emph{simulated} mechanical plant at \SI{100}{Hz}. Any current, voltage, timing, or pin value identified as an \emph{example} is not a tested electrical configuration. The DRI0058 provides no phase-current feedback through the specified interface; current-controlled FOC requires additional hardware.
 
-\tableofcontents
+\makeatletter
+\renewcommand*\l@section{\@dottedtocline{1}{0em}{2.0em}}
+\makeatother
+{\small\tableofcontents}
 \clearpage
 
 \section{Design objective and systems view}

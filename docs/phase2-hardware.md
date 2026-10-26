@@ -1,5 +1,7 @@
 # Phase 2 hardware
 
+For the detailed mathematical theory and embedded implementation plan, see the [voltage-mode FOC technical note](foc-voltage-mode-technical-note.pdf) ([LaTeX source](foc-voltage-mode-technical-note.tex)). The note is prospective design guidance; no physical FOC/PWM/encoder integration has been validated in this repository.
+
 This phase is not implemented. There is no FOC, no encoder driver, no phase PWM, and no use of the driver's enable, reset, sleep, or fault pins. The notes below are what the next integration has to decide, written so it does not disturb the speed PID or the task layout without a reason.
 
 ## Parts

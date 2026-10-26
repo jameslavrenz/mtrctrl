@@ -206,7 +206,8 @@ Read in this order if you are new to the tree:
 4. [Control design](docs/control-design.md), for the PID equations and which plant numbers are derived versus chosen.
 5. [Verification](docs/verification-validation.md), for host results and the numbers measured on this Nucleo.
 6. [Phase 2 hardware](docs/phase2-hardware.md), for the FIT1035, the AS5600, the DRI0058, and the voltage-mode FOC and PWM plan.
-7. [Vendored versions](third_party/VERSIONS.md), for the pinned FreeRTOS, CMSIS, and HAL commits.
+7. [Voltage-mode FOC technical note](docs/foc-voltage-mode-technical-note.pdf), for the full motor-model derivation, Clarke/Park transforms, SPWM and SVPWM, encoder alignment, STM32 PWM design, and from-scratch C++ implementation. The [LaTeX source](docs/foc-voltage-mode-technical-note.tex) is provided for reproducible editing.
+8. [Vendored versions](third_party/VERSIONS.md), for the pinned FreeRTOS, CMSIS, and HAL commits.
 
 ## Roadmap
 

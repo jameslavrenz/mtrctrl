@@ -41,8 +41,11 @@ else()
     target_include_directories(mtr_unit_tests PRIVATE tests)
     target_compile_definitions(mtr_unit_tests PRIVATE "MTR_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\"")
     target_link_libraries(mtr_unit_tests PRIVATE mtr_logic)
+    # -fno-rtti matches mtr_logic. GCC otherwise asks the library for
+    # SimulatedMotor's typeinfo, which the library does not emit.
     target_compile_options(mtr_unit_tests PRIVATE
         -Wall -Wextra -Wpedantic -Wshadow -Werror
+        -fno-rtti
         -fsanitize=address,undefined -fno-omit-frame-pointer
     )
     target_link_options(mtr_unit_tests PRIVATE -fsanitize=address,undefined)

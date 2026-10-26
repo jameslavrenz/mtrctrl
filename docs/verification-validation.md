@@ -140,7 +140,7 @@ The script writes `build/fw/hwtest.log` and `build/fw/hwtest-telemetry.csv`. The
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` has three jobs: host tests, Arm cross-compile, and cppcheck. None of them open a serial port or start OpenOCD. The workflow has not been executed on GitHub, because this tree has not been pushed. Local `make test`, `make firmware`, and `make cppcheck` are the runs that actually happened. The last `make cppcheck` completed with no findings.
+`.github/workflows/ci.yml` has three jobs: host tests, Arm cross-compile, and cppcheck. None of them open a serial port or start OpenOCD. The workflow runs on every push to GitHub. Local `make test`, `make firmware`, and `make cppcheck` are the runs that happened on this machine. The last local `make cppcheck` completed with no findings.
 
 ## Limits of what Phase 1 can claim
 

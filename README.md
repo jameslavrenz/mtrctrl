@@ -145,7 +145,7 @@ The last board run's numbers, including stack free words and the fault-injection
 
 Host tests cover the PID, the plant, fault transitions, the deadline-injection policy, the telemetry column order, the command parser, and text formatting. They link none of the HAL or FreeRTOS. ASan and UBSan are on for that binary. The runner is the harness in `tests/`, not GoogleTest.
 
-The GitHub Actions workflow in `.github/workflows/ci.yml` runs those three host jobs: unit tests, the Arm cross-compile, and cppcheck. It does not open a serial port or start OpenOCD. This repository has not been pushed, so that workflow has not run on GitHub. A green local `make test` is not a CI result.
+The GitHub Actions workflow in `.github/workflows/ci.yml` runs those three host jobs on every push: unit tests, the Arm cross-compile, and cppcheck. It does not open a serial port or start OpenOCD.
 
 ## Layout
 
@@ -185,7 +185,7 @@ Phase 2 replaces the simulated plant with the FIT1035, the AS5600, and the DRI00
 - The plant is not an identification of the FIT1035. Inertia is chosen, not measured.
 - Phase 1 has no current limit, no PWM, and no path that would stop a real driver. A safe state here only zeros the simulated torque command.
 - Board timing, stack high-water, and fault-injection results are in [docs/verification-validation.md](docs/verification-validation.md). They come from one `tools/hwtest.py` run on this NUCLEO-F446RE after the ST-Link was updated to V2J47M34. They are measurements of the simulated plant on that board, not a proof about a physical motor.
-- The GitHub Actions workflow is in the tree and has not been executed on GitHub.
+- GitHub Actions runs the host tests, the cross-compile, and cppcheck. It does not flash the board or run `tools/hwtest.py`.
 
 ## License of vendored code
 
